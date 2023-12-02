@@ -5,28 +5,54 @@ use crate::*;
 
 //------------------------------ PARSE INPUT
 
-fn parse_num(input: &str, part: usize) -> u64 {
+fn parse_num_from_str(input: &str, part: usize) -> Option<u64> {
     // Find all digits and copy to new array
     let digits = vec!["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
-    let mut copy = String::new();
-    let mut num: Vec<usize> = Vec::new();
-    for c in input.chars() {
-        copy.push(c);
-        if c.is_digit(10) {
-            num.push(c as usize - '0' as usize);
-        } else {
-            if part > 1 {
-                for i in 0..digits.len() {
-                    if copy.ends_with(digits[i]) {
-                        num.push(i);
-                    }
+
+    let c = input.chars().next().unwrap();
+    if c.is_digit(10) {
+            return Some(c as u64 - '0' as u64);
+    } else {
+        if part > 1 {
+            for i in 0..digits.len() {
+                if input.starts_with(digits[i]) {
+                    return Some(i as u64);
                 }
             }
         }
     }
+    return None;
+}
+
+#[test]
+fn test_numbers() {
+    assert_eq!(parse_num_from_str("12345", 1), Some(1));
+    assert_eq!(parse_num_from_str("five", 1), None);
+    assert_eq!(parse_num_from_str("five", 2), Some(5));
+}
+
+
+fn parse_num(input: &str, part: usize) -> u64 {
+
+    let mut left = 0u64;
+    let mut right = 0u64;
+    let end = input.len();
+    for i in 0..end {
+        if let Some(l) = parse_num_from_str(&input[i..], part) {
+            left = l;
+            break;
+        }
+    }
+
+    for i in 0..input.len() {
+        if let Some(r) = parse_num_from_str(&input[end-i-1..], part) {
+            right = r;
+            break;
+        }
+    }
 
     // print!("{input} -> {num:?}\n");
-    num[0] as u64 * 10u64 + num[num.len() - 1] as u64
+    left * 10u64 + right
 }
 
 
