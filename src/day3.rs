@@ -2,8 +2,6 @@
 use yaah::aoc;
 #[allow(unused)]
 use crate::*;
-use std::collections::HashSet;
-use std::iter::FromIterator;
 
 //------------------------------ PARSE INPUT
 
@@ -114,7 +112,7 @@ fn solve1(_input: &'static str) -> usize {
         for sym in syms.iter() {
             if touches(num, sym) {
                 total += num.num;
-                println!("{} touches {:?}", num.num, sym);
+                // println!("{} touches {:?}", num.num, sym);
                 break;
             }
         }
