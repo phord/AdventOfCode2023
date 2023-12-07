@@ -1006,12 +1006,9 @@ A9799 95
 A2727 410
 78888 626'''
 
-def value(card):
-    return "J23456789TQKA".index(card)
-
 def score(hand):
     # Count cards of each type in hand
-    # This creates a sorting that favors the highest count, then the highest value
+    # Create a sorting that favors the highest count
     # Five of a kind:  5
     # Four of a kind:  4 1
     # Full house:      3 2
@@ -1025,19 +1022,28 @@ def score(hand):
         if card not in counts:
             counts[card] = 0
         counts[card] += 1
-    return sorted(counts.values(), reverse=True)
+    c = sorted(counts.values(), reverse=True)
+
+    ## Most common non-joker
+    pop_card = 'A'
+    if 'J' in counts:
+        del counts['J']
+    if counts:
+        pop_card = sorted([(v,cc) for cc,v in counts.items()], reverse=True)[0][1]
+    return (c,pop_card)
 
 def bestScore(hand):
-    # Assuming J is a wildcard, find the best score for this hand
-    cards="23456789TQKA"
+    # Replace J with the most popular card for scoring
+    sc, card = score(hand)
     if 'J' in hand:
-        return max([bestScore(hand.replace('J', c, 1)) for c in cards])
-    return score(hand)
+        hand = hand.replace('J', card)
+        sc, _ = score(hand)
+    return sc
 
 # get best score and append tiebreaker values
 def tiebreak(hand):
     sc = bestScore(hand)
-    sc.extend([value(x) for x in hand])
+    sc.extend(["J23456789TQKA".index(card) for card in hand])
     return sc
 
 input = getem()
