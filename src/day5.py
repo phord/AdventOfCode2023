@@ -281,29 +281,31 @@ humidity-to-location map:
 4095868912 2360586995 99297853
 4033131940 2084505991 3704288'''
 
-# input = getem()
 
 map = {}
 convert = {}
 rev = {}
-cat=None
+seeds = None
 
-for lin in input.split('\n'):
-    lin.strip()
-    if len(lin) == 0:
-        continue
-    elif lin.startswith('seeds: '):
-        seeds = lin.split(':')[1].split()
-        seeds = [int(x) for x in seeds]
-    elif lin.endswith(' map:'):
-        cat = lin.split()[0]
-        words = cat.split('-')
-        convert[words[0]] = words[2]
-        rev[words[2]] = words[0]
-        cat = words[2]
-        map[cat] = []
-    else:
-        map[cat].append([int(x) for x in lin.split()])
+def parse(input):
+    global map,convert,rev, seeds
+    cat=None
+    for lin in input.split('\n'):
+        lin.strip()
+        if len(lin) == 0:
+            continue
+        elif lin.startswith('seeds: '):
+            seeds = lin.split(':')[1].split()
+            seeds = [int(x) for x in seeds]
+        elif lin.endswith(' map:'):
+            cat = lin.split()[0]
+            words = cat.split('-')
+            convert[words[0]] = words[2]
+            rev[words[2]] = words[0]
+            cat = words[2]
+            map[cat] = []
+        else:
+            map[cat].append([int(x) for x in lin.split()])
 
 def advance(start, typ):
     global convert, map
@@ -316,8 +318,8 @@ def advance(start, typ):
     m = map[nt]
     # find the index of the start value
     for mm in m:
-        dest, src, len = mm
-        if src <= start and start < src + len:
+        dest, src, ll = mm
+        if src <= start and start < src + ll:
             index = start - src + dest
             return (nt, index)
 
@@ -335,10 +337,6 @@ def get(seed, target):
 
     return seed
 
-## PART 1
-loc = [get(x, 'location') for x in seeds]
-print(min(loc))
-
 
 # calculate the intersection of two transforms.
 # a and b are tuples of (start, end, delta)
@@ -354,86 +352,68 @@ def intersect(a, b):
     a0 -= bd
     a1 -= bd
 
-    res = []
-    orig = []
-
     if a1 <= b0:
         # No intersection; keep a and b separate
-        return [b], [a]
+        return []
     if a0 >= b1:
         # No intersection; keep a and b separate
-        return [b], [a]
-
-    if a0 < b0:
-        ## original a map before b starts
-        orig.append((a0+bd, b0+bd, ad))
-    elif b0 < a0:
-        ## original b map before a starts
-        res.append((b0, a0, bd))
+        return []
 
     # Overlapping region
     clip0 = max(a0, b0)
     clip1 = min(a1, b1)
-    res.append((clip0, clip1, ad + bd))
+    return [(clip0, clip1, ad + bd)]
 
-    if a1 < b1:
-        ## original b map after a ends
-        res.append((clip1, b1, bd))
+# Inject the regions from a into b, replacing the parts in b that overlap with a.
+# Don't assume either is sorted.
+def inject(a, b):
+    a.sort()
+    b.sort()
 
-    if a1 > b1:
-        # original a map after b ends
-        orig.append((b1+bd, a1+bd, ad))
+    # print("inject", a, b)
+    ret = []
+    aa = None
+    bb = None
+    while len(a) > 0 or len(b) > 0:
+        if aa is None and len(a) > 0:
+            aa = a[0]
+            a = a[1:]
+        if bb is None and len(b) > 0:
+            bb = b[0]
+            b = b[1:]
+        # print("  ... ", aa, bb, " => ", ret)
 
-    return res, orig
-
+        if bb is None or (aa is not None and aa[1] <= bb[0]):
+            # aa is before bb; keep aa and advance
+            ret.append(aa)
+            aa = None
+        elif aa is None or bb[1] <= aa[0]:
+            # bb is before aa; keep bb and advance
+            ret.append(bb)
+            bb = None
+        else:
+            # aa and bb overlap; inject aa into bb
+            # print("##", aa, bb)
+            if aa[0] <= bb[0]:
+                bb = (aa[1], bb[1], bb[2])
+                if bb[0] == bb[1]:
+                    bb = None
+                ret.append(aa)
+                aa = None
+            else:
+                ret.append((bb[0], aa[0], bb[2]))
+                if bb[1] > aa[1]:
+                    bb = (aa[1], bb[1], bb[2])
+                else:
+                    bb = None
+    # print("inject => ", ret)
+    return ret
 
 # We need to calculate range from seed to location in one step by iterating
 # each step and calculating the ranges for each step and the resulting addition.
-# This is done by iterating the map in reverse order and calculating the
-# resulting range for each step, but calculating the delta for each operation
-# instead of the target range. The delta is then added to the resulting range
-# for each previous step.
-def invert():
-    global rev, map
-    # each entry in inv is start: (end, delta)
-    inv = [(0, 1E11, 0)]
-
-    pos = "location"
-    while True:
-        print(f"=== {pos} ===")
-        print(">>> ", inv)
-        m = map[pos]
-        for mm in m:
-            y, x0, len = mm
-            dx = y - x0
-            ## Calculate transform "a" for each map value in this pos
-            a = (y, y + len, dx)
-            org = a
-            # print(f"   {mm} => {a}")
-            new = []
-            for ii in inv:
-                # print("##", ii)
-
-                inter, a = intersect(a, ii)
-                new.extend(inter)
-
-            if a is not None:
-                print("FAIL: ", a)
-                return
-
-
-            inv = sorted(new)
-
-            print(f"  {mm} -> {org} -> {inv}")
-
-        pos = rev[pos]
-        if pos == "seed":
-            break
-
-    inv = sorted([(a-c, b-c, c) for a,b,c in inv])
-    return inv
-
-
+# This is done by iterating the map and calculating the transition values for
+# each step and storing the delta. Each new xform is converted to the base (seed)
+# coordinate system (frame of reference) to keep the bases in that frame.
 def solve():
     global rev, map
     # each entry in inv is start: (end, delta)
@@ -441,34 +421,27 @@ def solve():
 
     pos = "soil"
     while True:
-        print(f"=== {pos} ===")
-        print(">>> ", inv)
+        # print(f"=== {pos} ===")
+        # print(">>> ", inv)
         m = map[pos]
+        new = []
         for mm in m:
-            y, x0, len = mm
+            y, x0, ll = mm
             dx = y - x0
             ## Calculate transform "a" for each map value in this pos
-            org = (x0, x0 + len, dx)
-            print(f"   {mm} => {org}")
-            new = []
-            a = [org]
+            org = (x0, x0 + ll, dx)
+            # print(f"   {mm} => {org}")
+            a = org
             for ii in inv:
                 # print("##", ii)
 
-                if a:
-                    b = []
-                    for next in a:
-                        inter, remain = intersect(next, ii)
-                        print(f"  intersect {next} {ii} => {inter}")
-                        new.extend(inter)
-                        b.extend(remain)
-                    # a = b
-                else:
-                    new.append(ii)
+                inter = intersect(a, ii)
+                # print(f"  intersect {a} {ii} => {inter}")
+                new.extend(inter)
 
-            inv = sorted(new)
+        inv = inject(new, inv)
 
-            print(f"  {mm} -> {org} -> {inv}")
+        # print(f"  {m} -> {org} -> {inv}")
 
         # inv = sorted([(a+c, b+c, c) for a,b,c in inv])
         if pos == "location":
@@ -477,38 +450,67 @@ def solve():
 
     return inv
 
+def locate(seed, inv):
+    for a,b,c in inv:
+        if a <= seed and seed < b:
+            return (seed + c, b)
 
-## PART 2
-map['seed'] = []
-for i in range(len(seeds)//2):
-    start = seeds[i*2]
-    len = seeds[i*2+1]
-    map['seed'].append((start, start, len))
+def validate():
+    global inv
 
-# inv = invert()
+    # ensure inventory start/ends are contiguous
+    for i in range(len(inv)-1):
+        if inv[i][1] != inv[i+1][0]:
+            print("INVALID INVENTORY")
+            return False
+input = getem()
+
+parse(input)
 inv = solve()
+validate()
+
 print()
 print(inv)
 
-# # print(seeds2)
-# loc = [get(x, 'location') for x in seeds2]
-# print(min(loc))
+## PART 1
+loc = [get(x, 'location') for x in seeds]
+print(min(loc))
 
 
+## PART 1
+least = 1E11
+for s in seeds:
+    # print(s, locate(s, inv))
+    l = locate(s, inv)[0]
+    least = min(least, l)
+
+print (least)
 
 
+## PART 2
+valid = []
+for i in range(len(seeds)//2):
+    start = seeds[i*2]
+    ll = seeds[i*2+1]
+    valid.append((start, start + ll))
 
-# total = 0
-# for line in input.split('\n'):
-#     win, have = line.split(':')[1].split('|')
-#     win = set(win.split())
-#     have = have.split()
+print("=============================")
+print(valid)
+print(seeds)
+print("=============================")
 
-#     count = 0
-#     for val in have:
-#         if val in win:
-#             count += 1
-#     if count > 0:
-#         total += 2**(count-1)
+least = 1E11
+for v in valid:
+    start, end = v
+    for a,b,c in inv:
+            if start <= a and end > a:
+                l = a + c
+                least = min(least, l)
+                print(f"[{a},{b},{c}] => {l} ({a} + {c})")
+            if a < start and start < b:
+                l = start + c
+                least = min(least, l)
+                print(f"[{a},{b},{c}] => {l} ({start} + {c})")
+print (least)
 
-# print(total)
+print(get(3368234844, 'location'))
