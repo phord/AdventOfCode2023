@@ -2,12 +2,12 @@ use yaah::{aoc_lib, aoc_year};
 use std::str;
 
 mod day1;
-// mod day2;
-// mod day3;
-// mod day4;
+mod day2;
+mod day3;
+mod day4;
 // mod day5;
 // mod day6;
-// mod day7;
+mod day7;
 // mod day8;
 // mod day9;
 // mod day10;
@@ -111,6 +111,56 @@ pub fn group_between<'a>(inp: Vec<&'a[u8]>, delim: &'static str) -> Vec<Vec<&'a[
 fn as_str(inp: &[u8]) -> &str {
     let s = str::from_utf8(inp).expect("invalid utf8 bytes");
     s
+}
+
+// Parse first word up until whitespace.
+// Return first word and rest of string starting from the whitespace
+#[allow(unused)]
+fn parse_word(inp: &str, delim: char) -> (&str, &str) {
+    let mut end = 0;
+    for c in inp.chars() {
+        if c == delim {
+            break;
+        }
+        end += 1;
+    }
+    inp.split_at(end)
+}
+
+// Skip first word up until whitespace.
+#[allow(unused)]
+fn skip_word(inp: &str) -> &str {
+    let inp = skip_ws(inp);
+    let (a,b) = parse_word(inp, ' ');
+    b
+}
+
+// Skip whitespace
+#[allow(unused)]
+fn skip_ws(inp: &str) -> &str {
+    let mut end = 0;
+    for c in inp.chars() {
+        if !c.is_whitespace() {
+            break;
+        }
+        end += 1;
+    }
+    inp.split_at(end).1
+}
+
+// Parse a number from a string
+#[allow(unused)]
+fn parse_num(inp: &str) -> (usize, &str) {
+    let inp = skip_ws(inp);
+    let mut end = 0;
+    for c in inp.chars() {
+        if !c.is_digit(10) {
+            break;
+        }
+        end += 1;
+    }
+    let num = inp.split_at(end).0.parse::<usize>().unwrap();
+    (num, skip_ws(inp.split_at(end).1))
 }
 
 #[allow(unused)]
