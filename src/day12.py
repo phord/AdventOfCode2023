@@ -1007,98 +1007,46 @@ def getem():
 #??#???.?????????#?? 6,3,4
 ?#?#.?.?#? 3,1,2'''
 
-# ??????#?#?#?????????#?#?#?????????#?#?#?????????#?#?#?????????#?#?#?? [2, 2, 6, 2, 2, 6, 2, 2, 6, 2, 2, 6, 2, 2, 6]
-# #?????????#?????#?????????#?????#?????????#?????#?????????#?????#?????????#???? [1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2] = 40 + 20
-# #.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##
-# #.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##.#......###.....##........##
+from functools import lru_cache
 
-# ???????????????????????????????????????????????????????????????? [1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4] = 35 + 19
-# #.#.#.####.#.#.#.####.#.#.#.####.#.#.#.####.#.#.#.####.......... = N=10, M=21, (N+M-1)C(N) = 30C10 = 30045015
-
-# Match exactly m[:n] in s and return count of matches
-def matchsubset(s, m, n):
-    if n == 0:
-        if '#' in s:
-            # BAD underrun
-            return 0
-        # GOOD only ? left
-        return 1
-
-    if not s:
-        # BAD overrun
-        return 0
-
-    # assume first is damaged
-    l = m[0]
-    # damaged; l must fit
-    if l > len(s):
-        return 0
-    elif l == len(s):
-        return 1 if n == 1 else 0
-    elif s[l] == '?':
-        # GOOD it fits; recurse, skipping over delimiter
-        a = matchsubset(s[l+1:], m[1:], n-1)
-    else:
-        # GOOD it doesn't fit; nothing to count
-        a = 0
-
-    # If possible, also count without leading damage
-    if s[0] == '?':
-        a += matchsubset(s[1:], m, n)
-
-    return a
-
-# Match substring against as many m as possible
-# Return sets of (m-count, combinations)
-def matchsub(s, m):
-    out = []
-    width = 0
-    for n in range(len(m)+1):
-        if width + n - 1 > len(s):
-            break
-        mat = matchsubset(s, m, n)
-        if mat:
-            out.append((n, mat))
-        if n < len(m):
-            width += m[n]
-    return out
-
-
-def trymode(g, m):
-
-    # print(g, m, count)
-
-    # print(len(g))
-    # print(l, len(g), s, sum(m))
-
-    # run out of damage counters
-    if not m:
-        if '#' in ''.join([x[0] for x in g]):
-            return 0
-        else:
-            return 1
-
-    # run out of g, still have m
-    if not g and m:
-        # print("BAD ran out of g")
-        return 0
-
-    # Get possibilities for next matches
-    poss = matchsub(g[0], m)
+# Match all possible m in s and return count of matches
+@lru_cache(maxsize=10000, typed=False)
+def matchsubset(s, m):
 
     total = 0
-    for n,count in poss:
-        total += count * trymode(g[1:], m[n:])
+    if len(m) == 0:
+        if '#' in s:
+            return 0
+        return 1
+
+    # Find largest m
+    l = max(m)
+    li = m.index(l)
+
+    # Place largest element and recurse to place the rest
+    for i in range(len(s)-l+1):
+        if '.' in s[i:l+i]:
+            continue
+        if i > 0 and s[i-1] == '#':
+            continue
+        if i + l < len(s) and s[l+i] == '#':
+            continue
+        left = matchsubset(s[:max(0,i-1)], m[:li])
+        right = matchsubset(s[l+i+1:], m[li+1:])
+        total += left * right
     return total
 
-def condition(g, m):
-    while '..' in g:
-        # print(g)
-        g = g.replace('..', '.')
+
+def get_game(line):
+    global folded
+    g,m = line.split()
+    m = tuple([int(x) for x in m.split(',')]*folded)
+    g = '?'.join([g for i in range(folded)])
 
     g = g.strip('.')
-    g = g.split('.')
-    # g = [(x,(0 if '?' in x else len(x)) for x in g]
+    while '..' in g:
+        g = g.replace('..', '.')
+
     return (g,m)
 
 input = getem()
@@ -1107,16 +1055,17 @@ game = input.split('\n')
 
 folded = 5
 total = 0
-for i,line in enumerate(game):
-    g,m = line.split()
-    m = [int(x) for x in m.split(',')]*folded
-    g = '?'.join([g for i in range(folded)])
+def solve():
+    global total, folded, game
+    for i,line in enumerate(game):
+        g,m = get_game(line)
 
-    g,m = condition(g,m)
+        count = matchsubset(g,m)
+        print("=== ", count, g, m)
+        total += count
+    return total
 
-    print("=== ", g, m)
-    count = trymode(g,m)
-    print("=== ", count, g, m)
-    total += count
 
-print(total)
+# 65607131946466
+
+print(solve())
