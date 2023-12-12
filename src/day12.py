@@ -1008,8 +1008,63 @@ def getem():
 ?#?#.?.?#? 3,1,2'''
 
 # ??????#?#?#?????????#?#?#?????????#?#?#?????????#?#?#?????????#?#?#?? [2, 2, 6, 2, 2, 6, 2, 2, 6, 2, 2, 6, 2, 2, 6]
-# #?????????#?????#?????????#?????#?????????#?????#?????????#?????#?????????#???? [1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2]
-def trymode(g, m, count):
+# #?????????#?????#?????????#?????#?????????#?????#?????????#?????#?????????#???? [1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2, 1, 3, 2, 2] = 40 + 20
+# #.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##
+# #.###.##.##.#.###.##.##.#.###.##.##.#.###.##.##.#......###.....##........##
+
+# ???????????????????????????????????????????????????????????????? [1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4, 1, 1, 1, 4] = 35 + 19
+# #.#.#.####.#.#.#.####.#.#.#.####.#.#.#.####.#.#.#.####.......... = N=10, M=21, (N+M-1)C(N) = 30C10 = 30045015
+
+# Match exactly m[:n] in s and return count of matches
+def matchsubset(s, m, n):
+    if n == 0:
+        if '#' in s:
+            # BAD underrun
+            return 0
+        # GOOD only ? left
+        return 1
+
+    if not s:
+        # BAD overrun
+        return 0
+
+    # assume first is damaged
+    l = m[0]
+    # damaged; l must fit
+    if l > len(s):
+        return 0
+    elif l == len(s):
+        return 1 if n == 1 else 0
+    elif s[l] == '?':
+        # GOOD it fits; recurse, skipping over delimiter
+        a = matchsubset(s[l+1:], m[1:], n-1)
+    else:
+        # GOOD it doesn't fit; nothing to count
+        a = 0
+
+    # If possible, also count without leading damage
+    if s[0] == '?':
+        a += matchsubset(s[1:], m, n)
+
+    return a
+
+# Match substring against as many m as possible
+# Return sets of (m-count, combinations)
+def matchsub(s, m):
+    out = []
+    width = 0
+    for n in range(len(m)+1):
+        if width + n - 1 > len(s):
+            break
+        mat = matchsubset(s, m, n)
+        if mat:
+            out.append((n, mat))
+        if n < len(m):
+            width += m[n]
+    return out
+
+
+def trymode(g, m):
 
     # print(g, m, count)
 
@@ -1018,58 +1073,35 @@ def trymode(g, m, count):
 
     # run out of damage counters
     if not m:
-        if '#' in g:
+        if '#' in ''.join([x[0] for x in g]):
             return 0
         else:
             return 1
 
     # run out of g, still have m
     if not g and m:
-        if len(m) == 1 and m[0] == count:
-            # GOOD count matches last run
-            return 1
-        # print("BAD count doesn't match last run")
+        # print("BAD ran out of g")
         return 0
 
-    if count > m[0]:
-        # print("BAD Too much damage at start")
-        return 0
+    # Get possibilities for next matches
+    poss = matchsub(g[0], m)
 
-    # Have exactly count damage
-    if count == m[0]:
-        if g[0] == '#':
-            # print("BAD Have more damage")
-            return 0
-        else:
-            # GOOD, no damage
-            return trymode(g[1:], m[1:], 0)
+    total = 0
+    for n,count in poss:
+        total += count * trymode(g[1:], m[n:])
+    return total
 
-    # Have less than count damage so far
-    if g[0] == '#':
-        # GOOD, keep counting
-        return trymode(g[1:], m, count+1)
-    elif g[0] == '.':
-        if count == 0:
-            # Keep searching
-            return trymode(g[1:], m, 0)
-        # print("BAD, ran out of damage")
-        return 0
-    else:
-        assert g[0] == '?'
-        if count == 0:
-            # Undecided, try both
-            # print('---===', len(g))
-            a = trymode(g[1:], m, 0)
-            # print('--->>>', len(g), " = ", a)
-            b =  trymode(g[1:], m, 1)
-            # print('---<<<', len(g), " = ", b)
-            return a + b
-        else:
-            # GOOD, next cell must be damaged
-            return trymode(g[1:], m, count+1)
+def condition(g, m):
+    while '..' in g:
+        # print(g)
+        g = g.replace('..', '.')
 
+    g = g.strip('.')
+    g = g.split('.')
+    # g = [(x,(0 if '?' in x else len(x)) for x in g]
+    return (g,m)
 
-# input = getem()
+input = getem()
 
 game = input.split('\n')
 
@@ -1078,12 +1110,12 @@ total = 0
 for i,line in enumerate(game):
     g,m = line.split()
     m = [int(x) for x in m.split(',')]*folded
-    while '..' in g:
-        # print(g)
-        g = g.replace('..', '.')
     g = '?'.join([g for i in range(folded)])
 
-    count = trymode(g,m,0)
+    g,m = condition(g,m)
+
+    print("=== ", g, m)
+    count = trymode(g,m)
     print("=== ", count, g, m)
     total += count
 
