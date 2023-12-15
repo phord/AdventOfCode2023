@@ -823,6 +823,10 @@ def count_path(start):
     return path
 
 p = [count_path(xx) for xx in pos]
+q = [count_path(xx) for xx in [a[-1] for a in p]]
+print([len(xx) for xx in p])
+print([len(xx) for xx in q])
+print([xx[:3] for xx in q])
 
 lcm = 1
 for i in [len(pp) for pp in p]:

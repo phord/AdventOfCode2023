@@ -209,20 +209,17 @@ input = getem()
 total=0
 front=0
 for line in input.split('\n'):
-    map = []
     seq = [int(c) for c in line.split()]
-    map.append(seq)
 
-    # calc differences of each value in seq
-    while [x for x in seq if x != 0]:
+    part2 = 0
+    mul = -1
+    while any(seq):
+        total += seq[-1]
+        part2 = part2 - seq[0]
+        part2 = -part2
+        mul = -mul
         seq = [seq[i+1]-seq[i] for i in range(len(seq)-1)]
-        map.append(seq)
-
-    a,b = (0, 0)
-    for row in reversed(map):
-        b = row[0] - b
-        a += row[-1]
-    total += a
-    front += b
+    part2 *= mul
+    front += part2
 
 print(total, front)
