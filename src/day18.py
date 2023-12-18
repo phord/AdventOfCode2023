@@ -16,69 +16,51 @@ U 2 (#7a21e3)'''
 def getem():
     return open('src/day18.txt').read()
 
-def extents(grid):
-    minx = min([x for x,y in grid])
-    miny = min([y for x,y in grid])
-    maxx = max([x for x,y in grid])
-    maxy = max([y for x,y in grid])
-    return minx, miny, maxx, maxy
+def game(input, part1):
+    trench = []
+    x=0
+    y=0
+    trench.append((x,y))
+    # First line is 1 cube longer than the rest because we count the starting point
+    ofs = 1
+    for path in input.split('\n'):
+        dir, dist, color = path.split(' ')
+        if part1:  #Part 1
+            dist = int(dist)
+        else:  #Part 2
+            dist = int(color[2:7], 16)
+            dir = "RDLU"[int(color[-2:-1])]
 
-def flood(grid, pos):
-    minx, miny, maxx, maxy = extents(grid)
-    while pos:
-        x,y = pos.pop()
-
-        if x < minx or x > maxx or y < miny or y > maxy:
-            continue
-
-        if (x,y) in grid:
-            continue
-
-        grid.add((x,y))
-        pos.append((x+1,y))
-        pos.append((x-1,y))
-        pos.append((x,y+1))
-        pos.append((x,y-1))
-    return grid
-
-def show(grid):
-    minx, miny, maxx, maxy = extents(grid)
-    for y in range(miny, maxy+1):
-        for x in range(minx, maxx+1):
-            if (x,y) in grid:
-                print('#', end='')
-            else:
-                print('.', end='')
-        print()
-    print("===")
-
-input = getem()
-game = input.split('\n')
-
-trench = []
-x=0
-y=0
-trench.append((x,y))
-for path in game:
-    dir, dist, color = path.split(' ')
-    for d in range(int(dist)*2):
         if dir == 'R':
-            x += 1
+            x += dist + ofs
         elif dir == 'L':
-            x -= 1
+            x -= dist - ofs
         elif dir == 'U':
-            y -= 1
+            y -= dist - ofs
         elif dir == 'D':
-            y += 1
+            y += dist + ofs
         else:
             print('?', dir)
         trench.append((x,y))
+        ofs = 0
 
-trench = set(trench)
+    return trench
 
-new = flood(trench, [(1,1)])
+# Shoelace + perimeter
+# calculate area of a polygon given its vertices
+# Includes the area of the bounding box
+# https://web.archive.org/web/20100405070507/http://valis.cs.uiuc.edu/~sariel/research/CG/compgeom/msg00831.html
+# https://stackoverflow.com/questions/451426/how-do-i-calculate-the-area-of-a-2d-polygon
+def area(p):
+    segments = zip(p, p[1:] + [p[0]])
+    #                    interior area   perimeter perimeter
+    return 0.5 * abs(sum(x0*y1 - x1*y0 + abs(x1-x0) + abs(y1-y0)
+                         for ((x0, y0), (x1, y1)) in segments))
 
-trench = set([(x//2,y//2) for x,y in trench if x%2 == 0 and y%2 == 0])
-show(trench)
+input = getem()
 
-print(len(set(trench)))
+trench = game(input, True)
+print("Part 1: ", int(area(trench)))
+
+trench = game(input, False)
+print("Part 2: ", int(area(trench)))
