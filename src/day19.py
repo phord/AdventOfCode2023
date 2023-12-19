@@ -1,3 +1,6 @@
+from itertools import product
+
+
 input = '''px{a<2006:qkq,m>2090:A,rfg}
 pv{a>1716:R,A}
 lnx{m>1548:A,A}
@@ -80,14 +83,6 @@ def play(rules, ratings):
             exit(1)
     return total
 
-# a generator that yields items instead of returning a list
-def get_paths(rules):
-    work = "in"
-    path = []
-    num = 0
-    while num < n:
-        yield num
-        num += 1
 # Find all paths that lead to "A" from a given node
 def solve(rules, node, path):
     paths = []
@@ -110,7 +105,7 @@ def solve(rules, node, path):
     return paths
 
 def combos(path):
-    map = {'x': (1,4000), 'm': (1,4000), 'a': (1,4000), 's': (1,4000)}
+    map = {'x': (1,4001), 'm': (1,4001), 'a': (1,4001), 's': (1,4001)}
 
     for cond in path[:-1]:
         var = cond[0]
@@ -118,7 +113,7 @@ def combos(path):
         val = int(cond[2:])
         mn,mx = map[var]
         if comp == "<":
-            mx = min(mx, val-1)
+            mx = min(mx, val)
         elif comp == ">":
             mn = max(mn, val+1)
         elif comp == "=":
@@ -131,26 +126,6 @@ def combos(path):
 
     return [map[var] for var in "xmas"]
 
-# def ranges(p):
-#     return [set(range(mn,mx+1)) for mn,mx in p]
-
-# def common(p1, p2):
-#     return [s1.intersection(s2) for s1,s2 in zip(p1, p2)]
-
-# def unique(p1, p2):
-#     return [s1 - s2 for s1,s2 in zip(p1, p2)]
-
-# def count(p1):
-#     total = 1
-#     for i in range(4):
-#         total *= len(p1[i])
-#     return total
-
-# Find number of common hits between two combos
-def intersect(p1, p2):
-    n = [(max(mn1, mn2), min(mx1, mx2)) for (mn1, mx1), (mn2,mx2) in zip(p1, p2)]
-    return [(mn, mx) for mn,mx in n if mn <= mx]
-
 # Split two ranges into three disjoint ranges
 def split(r1, r2):
     mn1,mx1 = r1
@@ -160,7 +135,7 @@ def split(r1, r2):
     c1 = max(mn1, mn2)
     c2 = min(mx1, mx2)
     if c1 <= c2:
-        left = [ a for a in [(mn1, c1-1), (c2+1, mx1), (c1,c2)] if a[0] <= a[1]]
+        left = [ a for a in [(mn1, c1), (c2, mx1), (c1,c2+1)] if a[0] <= a[1]]
         return left
     else:
         return [r1]
@@ -172,7 +147,6 @@ def disjoint(p1, p2):
 
     lr = disjoint(p1[1:], p2[1:])
     a = []
-    b = []
     for l in left:
         for l2 in lr:
             a.append([l] + l2)
@@ -197,7 +171,7 @@ def count(p1):
     total = 1
     for i in range(4):
         mn,mx = p1[i]
-        total *= (mx-mn+1)
+        total *= (mx-mn)
     return total
 
 def show(p):
@@ -256,7 +230,15 @@ def disjoint_all(paths):
 # print()
 
 
-input = getem()
+def disjoiner(path, vertices):
+    # print(path)
+    rang = [sorted([x for x in s if p[0] <= x <= p[1]]) for p, s in zip(path, vertices)]
+    # print(rang)
+    rang = [[(a,b) for a,b in zip(x[0:-1], x[1:])] for x in rang]
+    # print(rang)
+    return product(*rang)
+
+# input = getem()
 
 g = game(input, True)
 g = play(*g)
@@ -265,11 +247,26 @@ print("Part 1: ", g)
 
 rules, _ = game(input, True)
 paths = solve(rules, "in", [])
-for p in paths:
-    print(combos(p), p)
-print()
+# for p in paths:
+#     print(combos(p), p)
+# print()
 
 comb = [combos(p) for p in paths]
+
+# get a map of every parameter range for every path
+vertices = []
+for i in range(4):
+    ps = set()
+    for p in comb:
+        ps.add(p[i][0])
+        ps.add(p[i][1])
+    vertices.append(ps)
+# print(vertices)
+
+# for p in comb:
+#     print(len(disjoiner(p, vertices)))
+#     print(disjoiner(p, vertices))
+    # print(sorted(disjoint_1xn(p, comb)))
 
 # dj = disjoint_all(comb)
 
@@ -282,18 +279,22 @@ comb = [combos(p) for p in paths]
 #             assert p in z
 
 print("Length of paths: ", len(paths))
+print("Length of vertices: ", [len(x) for x in vertices])
+
 seen = set()
 total = 0
 for i, (p, c) in enumerate(zip(paths, comb)):
     print(p, c)
-    dis = disjoint_1xn(c, comb)
-    if p[-1] == "A":
-        # remove paths already seen
-        dis -= seen
-        for x in dis:
-            # print(count(x), x)
-            total += count(x)
-    seen |= dis
+    dis = disjoiner(c, vertices)
+
+    for x in dis:
+        x = tuple(x)
+        # print(count(x), x)
+        if p[-1] == "A":
+            # remove paths already seen
+            if x not in seen: #dis -= seen
+                total += count(x)
+        seen.add(x)
 print(total)
 
 
