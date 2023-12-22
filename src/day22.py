@@ -41,21 +41,18 @@ def above_colliding(brick1, brick2):
     f2 = footprint(brick2)
     return len(f1.intersection(f2)) > 0
 
-def settle(grid, colliding):
-    while True:
-        moved = False
-        # for each brick, try to fall
-        for i in range(len(grid)):
+def settle(grid, colliding, supporting):
+    candidates = list(range(len(grid)))
+    while candidates:
+        candidates = sorted(candidates, key=lambda i: min([z for _,_,z in grid[i][1]]))
+        next = []
+        for i in candidates:
             brick = grid[i]
             if floored(brick) or removed(brick):
                 continue
 
-            highest = 0
-            for j in colliding[i]:
-                z = max([z for _,_,z in grid[j][1]])
-                if z > highest:
-                    highest = z
-
+            highest = [z for j in colliding[i] for _,_,z in grid[j][1]]
+            highest = max(highest) if highest else 0
             bottom = min([z for _,_,z in brick[1]])
             assert bottom > highest
             if bottom == highest + 1:
@@ -63,16 +60,10 @@ def settle(grid, colliding):
 
             # move brick down as far as possible
             distance = bottom - highest - 1
-            b = tuple([(x,y,z-distance) for x,y,z in brick[1]])
-
-            grid[i] = (i,b)
-            moved = True
-
-        if not moved:
-            break
+            grid[i] = (i,tuple([(x,y,z-distance) for x,y,z in brick[1]]))
+            next.extend([j for j in supporting[i] if touching(grid[i], grid[j])])
+        candidates = set(next)
     return grid
-
-# 808 is too high!
 
 input = open('src/day22.txt').read()
 
@@ -82,12 +73,7 @@ height = len(grid)
 
 def cubes(brick):
     (x,y,z),(t,u,v) = brick
-    out = []
-    for i in range(x,t+1):
-        for j in range(y,u+1):
-            for k in range(z,v+1):
-                out.append((i,j,k))
-    return tuple(out)
+    return tuple([(i,j,k) for i in range(x,t+1) for j in range(y,u+1) for k in range(z,v+1)])
 
 for i,line in enumerate(grid):
     a,b = line.split('~')
@@ -97,21 +83,30 @@ for i,line in enumerate(grid):
 
 print("pairing combatants...")
 # Map of bricks a brick may land on
-collide = {i: [] for i in range(len(grid))}
-for i, brick in enumerate(grid):
-    for j, brick2 in enumerate(grid):
-        if i == j:
-            continue
+collide = {i: set() for i in range(len(grid))}
+sgrid = sorted(grid, key=lambda brick: min([z for _,_,z in brick[1]]))
+for i, brick in enumerate(sgrid):
+    k = brick[0]
+    for brick2 in sgrid[:i]:
+        j = brick2[0]
         if above_colliding(brick, brick2):
-            collide[i].append(j)
+            collide[k].add(j)
+
+# If any lower bricks also collide with the same bricks as us, we can't land on them
+print("reducing collisions...")
+supporting = {i: [] for i in range(len(grid))}
+for k,v in collide.items():
+    redundant = set([i for j in v for i in collide[j]])
+    collide[k] = v - redundant
+    for j in collide[k]:
+        supporting[j].append(k)
 
 print("settling...")
-grid = settle(grid, collide)
+grid = settle(grid, collide, supporting)
 
 print("searching...")
 # Set of bricks that can't be removed
 ss = set()
-
 for a in grid:
     # Find bricks supporting a
     za = min([z for _,_,z in a[1]])
@@ -119,38 +114,26 @@ for a in grid:
     for j in collide[a[0]]:
         b = grid[j]
         zb = max([z for _,_,z in b[1]])
-        if zb+1 != za:
-            continue
-        supp.add(tuple(b))
+        if zb+1 == za:
+            supp.add(tuple(b))
     if len(supp) == 1:
         ss.add(supp.pop())
 
 print("filtering...")
-all = set([tuple(brick) for brick in grid])
+all = set(grid)
 removeable = all - ss
 print("part 1: ", len(removeable))
-# for i in sorted(list(removeable)):
-#     print(i)
 
 def count_diff(grid1, grid2):
-    count = 0
-    for brick in grid:
-        # print(brick, g2[brick[0]])
-        if g2[brick[0]][1] != ((0,0,0),) and g2[brick[0]][1] != brick[1]:
-            count += 1
-    return count
-
+    return len([1 for brick in grid if g2[brick[0]][1] != ((0,0,0),) and g2[brick[0]][1] != brick[1]])
 
 print("disintegrating...")
 ## Part 2: Find how many bricks are supported by one brick
 count = 0
-ii = 0
 for i, _ in ss:
-    ii += 1
     g2 = grid.copy()
     g2[i] = (i, ((0,0,0),))
-    g2 = settle(g2, collide)
+    g2 = settle(g2, collide, supporting)
     count += count_diff(grid, g2)
-    print(ii,count)
 
 print("Part2: ", count)
