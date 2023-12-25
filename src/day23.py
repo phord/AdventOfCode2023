@@ -23,15 +23,11 @@ input='''#.#####################
 #####################.#'''
 
 input = open('src/day23.txt').read()
-
 grid = tuple(input.split('\n'))
 width = len(grid[0])
 height = len(grid)
 
-start = (1,0)
-end = (width-2, height-1)
-
-def dump(grid, path):
+def dump(path):
     for y in range(height):
         for x in range(width):
             if (x,y) in path:
@@ -40,14 +36,12 @@ def dump(grid, path):
                 print(grid[y][x], end='')
         print()
 
-def neighbors(grid, x,y):
-    nbors = []
+def neighbors(x,y):
     for dx,dy in ((0,1),(1,0),(0,-1),(-1,0)):
         nx,ny = x+dx,y+dy
         if 0 <= nx < width and 0 <= ny < height:
             if grid[ny][nx] in '.<>^v':
-                nbors.append((nx,ny))
-    return tuple(nbors)
+                yield (nx,ny)
 
 def measure(edges, start, head):
     count = 1
@@ -61,12 +55,12 @@ def measure(edges, start, head):
     return (count, head)
 
 
-def trails(grid):
+def trails():
     edges = {}
     for y in range(height):
         for x in range(width):
             if grid[y][x] in '.<>^v':
-                edges[(x,y)] = [(1,n) for n in neighbors(grid, x,y)]
+                edges[(x,y)] = [(1,n) for n in neighbors(x,y)]
 
     # Collapse all trail segments into a single edge
     newedges = {}
@@ -76,7 +70,7 @@ def trails(grid):
 
     return newedges
 
-def dfs(grid, trails, start, end):
+def dfs(trails, start, end):
     seen = set([start])
     stack = [(start, 0, seen)]
     mx = 0
@@ -91,4 +85,8 @@ def dfs(grid, trails, start, end):
 
     return mx
 
-print( dfs(grid, trails(grid), start, end))
+print(len(trails()))
+
+start = (1,0)
+end = (width-2, height-1)
+print( dfs(trails(), start, end))
